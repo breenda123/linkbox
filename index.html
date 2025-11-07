@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📦 LinkBox</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: linear-gradient(to bottom right, #f9fafb, #e0e7ff);
+    font-family: 'Inter', sans-serif;
+  }
+  main { min-height: 100vh - 60px; padding: 2.5rem; }
+</style>
+<body class="bg-gradient-to-br from-[#f9fafb] to-[#e0e7ff] p-10 font-[Inter]">
+<main class="max-w-6xl mx-auto">
+
+  <header class="flex flex-wrap items-center justify-between mb-12 gap-2">
+    <h1 class="text-4xl font-extrabold text-gray-800 tracking-tight">📦 LinkBox</h1>
+    <div class="flex gap-2 flex-wrap">
+      <button id="addBtn" class="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-full shadow hover:scale-105 hover:shadow-lg transition-transform duration-200">
+        ➕ Thêm
+      </button>
+      <button id="exportBtn" class="px-4 py-2 bg-green-500 text-white rounded-full hover:scale-105 transition">
+        💾 Xuất dữ liệu
+      </button>
+      <input type="file" id="importInput" accept=".json" class="hidden" />
+      <button id="importBtn" class="px-4 py-2 bg-yellow-500 text-white rounded-full hover:scale-105 transition">
+        📂 Import dữ liệu
+      </button>
+    </div>
+  </header>
+
+  <section id="grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-8 place-items-center"></section>
+
+  <div id="formPopup" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white/90 backdrop-blur-xl p-6 rounded-3xl shadow-2xl w-80 relative animate-fadeIn border border-gray-200">
+      <button id="closeForm" class="absolute top-3 right-4 text-gray-500 hover:text-black">✕</button>
+      <h2 id="formTitle" class="text-xl font-semibold mb-4 text-center text-gray-800"></h2>
+      <div class="flex flex-col gap-3">
+        <input id="nameInput" placeholder="Tên hiển thị" class="border border-gray-300 rounded-lg p-2 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition" />
+        <input id="urlInput" placeholder="URL (https://...)" class="border border-gray-300 rounded-lg p-2 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition" />
+        <input id="imageInput" placeholder="Link hình ảnh (tùy chọn)" class="border border-gray-300 rounded-lg p-2 bg-white text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition" />
+        <button id="saveBtn" class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-full py-2 mt-2 hover:scale-105 hover:shadow-lg transition-transform duration-200"></button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  let data = { webLinks: [] };
+  const saved = localStorage.getItem('linkboxData');
+  if (saved) data = JSON.parse(saved);
+
+  let editingItem = null;
+  const grid = document.getElementById('grid');
+  const formPopup = document.getElementById('formPopup');
+  const formTitle = document.getElementById('formTitle');
+  const nameInput = document.getElementById('nameInput');
+  const urlInput = document.getElementById('urlInput');
+  const imageInput = document.getElementById('imageInput');
+  const saveBtn = document.getElementById('saveBtn');
+
+  function renderLinks() {
+    grid.innerHTML = '';
+    data.webLinks.forEach(item => {
+      const div = document.createElement('div');
+      div.className = "flex flex-col items-center justify-center w-24 h-28 bg-white/60 backdrop-blur-lg border border-gray-200 rounded-2xl shadow-sm hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group";
+      div.title = item.name;
+      div.onclick = () => item.url && window.open(item.url, "_blank");
+      div.innerHTML = `
+        <div class="w-14 h-14 mt-[14px] bg-white rounded-2xl overflow-hidden flex items-center justify-center mb-2 shadow-inner">
+          <img src="${item.image || 'https://cdn-icons-png.flaticon.com/512/833/833524.png'}" alt="${item.name}" class="w-full h-full object-contain"/>
+        </div>
+        <div class="text-center text-gray-800 text-sm font-medium truncate w-full px-1">${item.name}</div>
+        <div class="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition">
+          <button class="hover:text-blue-600">✏️</button>
+          <button class="hover:text-red-600">🗑️</button>
+        </div>
+      `;
+      div.querySelector('button:first-child').onclick = e => { e.stopPropagation(); openForm(item); };
+      div.querySelector('button:last-child').onclick = e => { e.stopPropagation(); deleteItem(item.id); };
+      grid.appendChild(div);
+    });
+  }
+
+  function openForm(item = null) {
+    editingItem = item;
+    formPopup.classList.remove('hidden');
+    formTitle.textContent = item ? '✏️ Sửa mục' : '➕ Thêm mục mới';
+    saveBtn.textContent = item ? '💾 Lưu thay đổi' : '➕ Thêm mới';
+    nameInput.value = item?.name || '';
+    urlInput.value = item?.url || '';
+    imageInput.value = item?.image || '';
+  }
+
+  document.getElementById('addBtn').onclick = () => openForm();
+  document.getElementById('closeForm').onclick = () => formPopup.classList.add('hidden');
+
+  saveBtn.onclick = () => {
+    const item = { id: editingItem?.id || Date.now(), name: nameInput.value, url: urlInput.value, image: imageInput.value };
+    if (editingItem) {
+      const index = data.webLinks.findIndex(i => i.id === editingItem.id);
+      data.webLinks[index] = item;
+    } else data.webLinks.push(item);
+    localStorage.setItem('linkboxData', JSON.stringify(data));
+    renderLinks();
+    formPopup.classList.add('hidden');
+  }
+
+  function deleteItem(id) {
+    if (confirm('Bạn có chắc muốn xóa mục này?')) {
+      data.webLinks = data.webLinks.filter(i => i.id !== id);
+      localStorage.setItem('linkboxData', JSON.stringify(data));
+      renderLinks();
+    }
+  }
+
+  document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "linkbox.json";
+    a.click();
+  }
+
+  document.getElementById('importBtn').onclick = () => document.getElementById('importInput').click();
+  document.getElementById('importInput').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try { data = JSON.parse(ev.target.result); localStorage.setItem('linkboxData', JSON.stringify(data)); renderLinks(); }
+      catch { alert("❌ File import không hợp lệ!"); }
+    }
+    reader.readAsText(file);
+  }
+
+  renderLinks();
+</script>
+
+</body>
+</html>
